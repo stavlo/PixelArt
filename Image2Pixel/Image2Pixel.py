@@ -11,15 +11,14 @@ def choose_image_file():
     return filedialog.askopenfilename(title="Select an image",
                                       filetypes=[("Image files", "*.jpg *.png *.jpeg *.bmp")])
 
-def show_images(original, pixel_art, palette):
+def show_images(original, pixel_art, palette, coustum=False):
     _, indexes, counts = np.unique(pixel_art[:, :, 0], return_index=True, return_counts=True)
     unique = pixel_art.reshape(-1, 3)[indexes]
     usage_percent = dict(zip(unique[:,1], counts / counts.sum() * 100))
-
     # Sort palette by brightness
-    brightness = palette.mean(axis=1)
+    brightness = unique.mean(axis=1)
     sorted_indices = np.argsort(brightness)
-    palette_sorted = palette[sorted_indices]
+    palette_sorted = unique[sorted_indices]
     usage_sorted = [usage_percent[palette_sorted[i,1]] for i in sorted_indices]
 
     # Plot original and pixel art
@@ -51,7 +50,7 @@ def show_images(original, pixel_art, palette):
     plt.tight_layout()
     plt.show()
 
-def save_outputs(pixel_art, palette_sorted, numbered,  is_gray='y', output_dir='pixel_art_output'):
+def save_outputs(pixel_art, palette_sorted, numbered,  is_gray='y', output_dir='../pixel_art_output'):
     os.makedirs(output_dir, exist_ok=True)
     if is_gray == 'y':
         img = cv2.cvtColor(pixel_art, cv2.COLOR_BGR2GRAY)
@@ -86,12 +85,59 @@ if __name__ == "__main__":
     img = denoise_image(original, method=denoise_method)
     img = apply_gamma_correction(img, 0.85)
 
-    if use_mosaic == 'y':
+    use_custom_palette = 'y' # input("Use custom palette? (y/n): ").strip().lower()
+    if use_custom_palette == 'y':
+        # while True:
+        #     # 50,50,50;80,80,80;110,110,110;200,200,200;250,250,250
+        #     print("\nEnter your custom palette as RGB values. Format: R,G,B;R,G,B;...")
+        #     print("Example (5 colors): 0,0,0;255,255,255;255,0,0;0,255,0;0,0,255")
+        #     print("Or press ENTER to use default palette.")
+        #
+        #     user_input = input("Palette: ").strip()
+        #     if user_input:
+        #         try:
+        #             rgb_list = [
+        #                 tuple(map(int, color.strip().split(',')))
+        #                 for color in user_input.split(';')
+        #             ]
+        #             custom_palette = np.array(rgb_list, dtype=np.uint8)[:, ::-1]  # RGB to BGR
+        #         except:
+        #             print("⚠️ Invalid format. Try again.")
+        #             continue
+        #     else:
+        #         # Default palette
+        custom_palette = np.array([
+            [50,50,50],
+            [80,80,80],
+            [110,110,110],
+            [200,200,200],
+            [250,250,250],
+        ], dtype=np.uint8)
+
+        # small = resize_image(img, num_pixels)
+        # pixel_art, palette = quantize_to_custom_palette(small, custom_palette)
+        orginal, mosaic, palette, shape = create_mosaic(img, num_tiles_wide=num_pixels, num_tones=num_colors)
+        numbers = mosaic[:, :, 0]
+        _, indexes, counts = np.unique(mosaic[:, :, 0], return_index=True, return_counts=True)
+        unique = mosaic.reshape(-1, 3)[indexes]
+        for i, level in enumerate(unique[:, 0]):
+            numbers[np.where(mosaic[:, :, 0] == level)] = i
+        pixel_art = custom_palette[numbers]
+        original = img
+        is_gray = 'n'
+
+        # show_images(original, pixel_art, palette)
+
+            # satisfied = input("Are you satisfied with the result? (y/n): ").strip().lower()
+            # if satisfied == 'y':
+            #     break
+
+    elif use_mosaic == 'y':
         orginal, pixel_art, palette, shape = create_mosaic(img, num_tiles_wide=num_pixels, num_tones=num_colors)
         is_gray = 'y'
 
-    if use_mosaic != 'y':
-        mode = input("Convert to grayscale? (y/n): ").strip().lower()
+    else:
+        mode = 'y' # input("Convert to grayscale? (y/n): ").strip().lower()
         is_gray = (mode == 'y')
 
         original, pixel_art, palette, shape = convert_to_pixel_art(
@@ -106,4 +152,5 @@ if __name__ == "__main__":
         brightness = palette.mean(axis=1)
         sorted_indices = np.argsort(brightness)
         palette_sorted = palette[sorted_indices]
-        save_outputs(pixel_art, palette_sorted, numbered, is_gray)
+        name = input("Enter a name: ").strip().lower()
+        save_outputs(pixel_art, palette_sorted, numbered, is_gray, output_dir='../pixel_art_output/' + name)

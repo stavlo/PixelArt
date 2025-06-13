@@ -110,3 +110,27 @@ def convert_to_pixel_art(img, num_pixels, num_colors, is_gray=False):
     small = resize_image(img, num_pixels)
     pixel_art, palette = quantize_colors_lab(small, num_colors)
     return img, pixel_art, palette, small.shape[:2]
+
+def quantize_to_custom_palette(image, palette_bgr):
+    """
+    Quantizes an image to a given color palette.
+
+    Parameters:
+    - image: input image in BGR format (np.ndarray)
+    - palette_bgr: array of BGR colors (shape: [N_colors, 3])
+
+    Returns:
+    - quantized: output image with same shape as input, colors from palette
+    - palette_bgr: reordered palette (same as input)
+    """
+    img_lab = cv2.cvtColor(image, cv2.COLOR_BGR2Lab).reshape(-1, 3)
+    palette_lab = cv2.cvtColor(palette_bgr[np.newaxis, :, :], cv2.COLOR_BGR2Lab)[0]
+
+    # Compute distances to palette
+    distances = np.linalg.norm(img_lab[:, np.newaxis, :] - palette_lab[np.newaxis, :, :], axis=2)
+    closest = np.argmin(distances, axis=1)
+
+    # Map to palette
+    quantized_flat = palette_bgr[closest]
+    quantized = quantized_flat.reshape(image.shape)
+    return quantized, palette_bgr
